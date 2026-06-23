@@ -1,4 +1,4 @@
-name: Maven Build and SonarQube
+name: CI-CD Pipeline
 
 on:
   push:
@@ -6,39 +6,51 @@ on:
       - main
 
 jobs:
-  build:
+  build-sonar-deploy:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Build Project
-        run: mvn clean package
-        working-directory: java-project-maven-new-master/java-project-maven-new-master
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
 
-      - name: SonarQube Scan
-        run: |
-          mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-        working-directory: java-project-maven-new-master/java-project-maven-new-master
+    - name: Build WAR
+      run: |
+        cd java-project-maven-new-master/java-project-maven-new-master
+        mvn clean package
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+    - name: SonarQube Scan
+      run: |
+        cd java-project-maven-new-master/java-project-maven-new-master
+        mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+        -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+        -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-      - name: Upload WAR to S3
-        run: |
-          aws s3 cp \
-          java-project-maven-new-master/java-project-maven-new-master/target/myapp.war \
-          s3://${{ secrets.S3_BUCKET }}/
+    - name: Configure AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Upload WAR to S3
+      run: |
+        aws s3 cp \
+        java-project-maven-new-master/java-project-maven-new-master/target/myapp.war \
+        s3://${{ secrets.S3_BUCKET }}/myapp.war
+
+    - name: Deploy to Tomcat
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          aws s3 cp s3://${{ secrets.S3_BUCKET }}/myapp.war /root/apache-tomcat-11.0.22/webapps/myapp.war
