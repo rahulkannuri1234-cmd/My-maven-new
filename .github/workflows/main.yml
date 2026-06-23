@@ -1,4 +1,4 @@
-name: Maven Build
+name: Maven Build and SonarQube
 
 on:
   push:
@@ -21,6 +21,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Maven Build
-        working-directory: java-project-maven-new-master/java-project-maven-new-master
+      - name: Build Project
         run: mvn clean package
+        working-directory: java-project-maven-new-master/java-project-maven-new-master
+
+      - name: SonarQube Scan
+        run: |
+          mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+          -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        working-directory: java-project-maven-new-master/java-project-maven-new-master
