@@ -22,4 +22,5 @@ jobs:
           java-version: '17'
 
       - name: Maven Build
+        working-directory: java-project-maven-new-master/java-project-maven-new-master
         run: mvn clean package
